@@ -19,10 +19,10 @@ class Robot:
         self.feedback= None
         self.speed = 70
         self.acj = 20
-        self.suction_on = False
+        self.suction_on = 0
         self.dashboard_port = 29999
         self.move_port = 30003
-
+    #TODO : change the mentod name to dashboard_connect and for move alsoo
 
     def _connect_dashboard(self):
         self.dashboard = DobotApiDashboard(self.ip, self.dashboard_port)
@@ -140,11 +140,11 @@ class Robot:
 
     def toggle_gripper(self):
         if not self.suction_on:
-            self.suction_on=True
+            self.suction_on=1
             self.dashboard.ToolDOExecute(2, 0)
             self.dashboard.ToolDOExecute(1, 1)
         elif self.suction_on:
-            self.suction_on = False
+            self.suction_on = 0
             self.dashboard.ToolDOExecute(1, 0)
             self.dashboard.ToolDOExecute(2, 1)
 
