@@ -133,10 +133,8 @@ class Robot:
 
     def send_actions(self, x, y, z, rx, ry, rz):
         #need to write a check logic where the actions are in the range. or else it raises a error.
-        # actions = str(actions)[1:-1]
-        # command= f"ServoP({actions})"
-        #self.move.send_data(command)
-        self.move.ServoP(x, y, z, rx, ry, rz)## later change it to send_data
+        command= f"ServoP({x}, {y}, {z}, {rx}, {ry}, {rz})"
+        self.move.send_data(command)
 
     def toggle_gripper(self):
         if not self.suction_on:
