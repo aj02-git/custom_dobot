@@ -1,4 +1,4 @@
-from dobot_api.dobot_api import DobotApiDashboard, DobotApiMove
+from dobot_api.dobot_api import DobotApiDashboard, DobotApiMove, DobotApiFeedBack
 import traceback
 import time
 from enum import IntEnum
@@ -17,17 +17,22 @@ class Robot:
         self.dashboard = None
         self.move = None
         self.feedback= None
-        self.speed = 70
+        self.speed = 100
         self.acj = 20
         self.suction_on = 0
         self.dashboard_port = 29999
         self.move_port = 30003
+        self.feedback_port = 30004
+        self.target_Tool = 1
+
     #TODO : change the mentod name to dashboard_connect and for move alsoo
 
     def _connect_dashboard(self):
         self.dashboard = DobotApiDashboard(self.ip, self.dashboard_port)
     def _connect_move(self):
         self.move = DobotApiMove(self.ip, self.move_port)
+    def _connect_feedback(self):
+        self.feedback = DobotApiFeedBack(self.ip, self.feedback_port)
 
     def _connect_ip(self):
         """Connect to robot dashboard, move, and feedback interfaces"""
@@ -36,6 +41,7 @@ class Robot:
             # Dashboard for control and status commands (e.g., Enable, Mode)
             self._connect_dashboard()
             self._connect_move() # Move commands also go to 30003
+            self._connect_feedback()
             # Feedback for the high-frequency data stream
             #self.feedback = DobotApiFeedBack(self.ip, 30004)
         except Exception as e:
@@ -78,6 +84,9 @@ class Robot:
             self.dashboard.SpeedFactor(self.speed)
             self.dashboard.AccJ(self.acj)
             time.sleep(1)
+            self.dashboard.Tool(self.target_Tool)
+            # Give the controller a moment to process the command and update its internal state
+            time.sleep(0.1)
         except Exception as e:
             print(f"Robot initialization failed: {e}")
             traceback.print_exc()
@@ -114,6 +123,18 @@ class Robot:
         return position, angles # need to add logic to check the size of the position and angles.
 
 
+    def get_action_angles(self, pose):
+        """This method gets inverse solution to getpose to get action angles"""
+        angles = None
+        angle_data = self.dashboard.InverseSolution(*pose,0,self.target_Tool) # The tool index here MUST match the active tool.
+        match = re.search(r'\{([-\d\.\s,]+)\}', angle_data)
+        if match:
+            angles = [float(v.strip()) for v in match.group(1).split(',')]
+        else:
+            print("Error: Could not parse angle from Inv_sol response.")
+        return angles
+
+
     def connect(self):
         self._connect_ip()
         self.initialize()
@@ -133,8 +154,19 @@ class Robot:
 
     def send_actions(self, x, y, z, rx, ry, rz):
         #need to write a check logic where the actions are in the range. or else it raises a error.
+        # actions = str(actions)[1:-1]
         command= f"ServoP({x}, {y}, {z}, {rx}, {ry}, {rz})"
         self.move.send_data(command)
+        #self.move.ServoP(x, y, z, rx, ry, rz)## later change it to send_data
+
+    def send_angles(self, action_a):
+        #need to write a check logic where the actions are in the range. or else it raises a error.
+        j1, j2, j3, j4, j5, j6 = action_a
+        gain = 500 # Proportional gain (200-1000). Higher = stiffer, more aggressive.
+        lookahead_time = 50 # Derivative/Damping term (20-100). Higher = smoother.  t={0.070}
+        command = f"ServoJ({j1:.4f},{j2:.4f},{j3:.4f},{j4:.4f},{j5:.4f},{j6:.4f},t= {0.1}, gain={gain},lookahead_time={lookahead_time})"
+        self.move.send_data(command)
+        #self.move.ServoJ(j1,j2, j3, j4, j5, j6, t= 0.11, gain=500,lookahead_time=60)## later change it to send_data
 
     def toggle_gripper(self):
         if not self.suction_on:
